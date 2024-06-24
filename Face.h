@@ -1,9 +1,16 @@
 #pragma once
 #include <iostream> 
 #include <list> 
+#include"commonFunctions.h"
 
 using namespace std;
 
+class Face;
+class edge;
+class vertex;
+class EdgeLoop;
+
+int boundingBox(list<vertex*>* pVertexList, double* pMin, double* pMax);
 static int edgeId = 1, faceId = 1, loopId = 1, vertexId = 1;
 class edge
 {
@@ -11,9 +18,12 @@ class edge
 	double m_dEdgelength;
 	int m_scratch;
 
-	list<Face*> faceList;
-	list<vertex*> vertexlist;
-	vertex* pVertexArray[2];
+	//list<Face*> faceList;
+	list<vertex*>* vertexlist;
+
+	list<Face*>* faceList;
+
+	list<Face*>::iterator it;
 
 public:
 	edge()
@@ -21,6 +31,8 @@ public:
 		m_id = edgeId;
 		edgeId++;
 		m_scratch = 0;
+		faceList = new list<Face*>;
+		vertexlist = new list<vertex*>;
 	}
 
 	int setColor(int color)
@@ -44,37 +56,33 @@ public:
 
 	int setVertexlist(vertex* pStartVertex, vertex* pEndVertex)
 	{
-		pVertexArray[0] = pStartVertex;
-		pVertexArray[1] = pEndVertex;
-		vertexlist.push_back(pStartVertex);
-		vertexlist.push_back(pEndVertex);
+
+		vertexlist->push_back(pStartVertex);
+		vertexlist->push_back(pEndVertex);
 		return 1;
 	}
-	vertex** getVertexArray()
-	{
-		return pVertexArray;
-	}
+
 	int getVertexList(list<vertex*>** pVertexList)
 	{
-		*pVertexList = &vertexlist;
+		*pVertexList = vertexlist;
 		return 1;
 	}
 	int setFacelist(Face* pFace)
 	{
-		faceList.push_back(pFace);
+		faceList->push_back(pFace);
 		return 1;
 	}
 	int getFaceList(list<Face*>** pFaceList)
 	{
-		*pFaceList = &faceList;
+		*pFaceList = faceList;
 		return 1;
 	}
 };
 class vertex
 {
 	double dXY[2];
-	list<Face*> faceList;
-	list<edge*> edgeList;
+	list<Face*>* faceList;
+	list<edge*>* edgeList;
 	int m_id, m_Scratch;
 
 public:
@@ -86,25 +94,27 @@ public:
 		m_id = vertexId;
 		vertexId++;
 		m_Scratch = 0;
+		faceList = new list<Face*>;
+		edgeList = new list<edge*>;
 	}
 	int setFacelist(Face* pFace)
 	{
-		faceList.push_back(pFace);
+		faceList->push_back(pFace);
 		return 1;
 	}
 	int getFaceList(list<Face*>** pFaceList)
 	{
-		*pFaceList = &faceList;
+		*pFaceList = faceList;
 		return 1;
 	}
 	int getEdgeList(list<edge*>** pEdgeList)
 	{
-		*pEdgeList = &edgeList;
+		*pEdgeList = edgeList;
 		return 1;
 	}
 	int setEdgeList(edge* pEdge)
 	{
-		edgeList.push_back(pEdge);
+		edgeList->push_back(pEdge);
 		return 1;
 	}
 	double* getVertexPosition()
@@ -123,8 +133,8 @@ class EdgeLoop
 	double m_dArea, dBoundingBox[4];
 	int m_id;
 
-	list<edge*> edgeList;
-	list<vertex*> vertexlist;
+	list<edge*>* edgeList;
+	list<vertex*>* vertexlist;
 	vertex* pStartVertex;
 
 public:
@@ -135,6 +145,14 @@ public:
 		m_nLoopType = 0;
 		m_nScratch = 0;
 		pStartVertex = pVertex;
+		m_pParentFace = NULL;
+		m_dArea = 0.0;
+		for (int i = 0; i < 4; i++)
+			dBoundingBox[i] = 0.0;
+
+		edgeList = new list<edge*>;
+		vertexlist = new list<vertex*>;
+
 	}
 
 	int setArea(double area)
@@ -159,7 +177,7 @@ public:
 	}
 	int updateBoundingBox()
 	{
-		boundingBox(&vertexlist, dBoundingBox, &dBoundingBox[2]);
+		boundingBox(vertexlist, dBoundingBox, &dBoundingBox[2]);
 		return 0;
 	}
 	double* getBoundingBox()
@@ -168,22 +186,22 @@ public:
 	}
 	int setEdgeList(edge* pEdge)
 	{
-		edgeList.push_back(pEdge);
+		edgeList->push_back(pEdge);
 		return 1;
 	}
 	int getEdgeList(list<edge*>** pEdgeList)
 	{
-		*pEdgeList = &edgeList;
+		*pEdgeList = edgeList;
 		return 1;
 	}
 	int setVertexlist(vertex* pVertex)
 	{
-		vertexlist.push_back(pVertex);
+		vertexlist->push_back(pVertex);
 		return 1;
 	}
 	int getVertexList(list<vertex*>** pVertexList)
 	{
-		*pVertexList = &vertexlist;
+		*pVertexList = vertexlist;
 		return 1;
 	}
 
@@ -195,10 +213,10 @@ class Face
 
 	double m_dArea, dBoundingBox[4];
 
-	list<edge*> edgeList;
-	list<edge*> commonEdgeList;
-	list<vertex*> vertexlist;
-	list<EdgeLoop*>edgeLoopList;
+	list<edge*>* edgeList;
+	list<edge*>* commonEdgeList;
+	list<vertex*>* vertexlist;
+	list<EdgeLoop*>* edgeLoopList;
 
 public:
 
@@ -206,6 +224,13 @@ public:
 	{
 		m_id = faceId;
 		faceId++;
+
+		edgeList = new list<edge*> ;
+		commonEdgeList = new list<edge*>;
+		vertexlist = new list<vertex*>;
+		edgeLoopList = new list<EdgeLoop*>;
+		m_dArea = 0.0;
+
 	}
 	int setArea(double area)
 	{
@@ -233,7 +258,7 @@ public:
 	}
 	int updateBoundingBox()
 	{
-		boundingBox(&vertexlist, dBoundingBox, &dBoundingBox[2]);
+		boundingBox(vertexlist, dBoundingBox, &dBoundingBox[2]);
 		return 0;
 	}
 	int setColor(int color)
@@ -247,42 +272,42 @@ public:
 	}
 	int setEdgeList(edge* pEdge)
 	{
-		edgeList.push_back(pEdge);
+		edgeList->push_back(pEdge);
 		return 1;
 	}
 	int getEdgeList(list<edge*>** pEdgeList)
 	{
-		*pEdgeList = &edgeList;
+		*pEdgeList = edgeList;
 		return 1;
 	}
 	int getEdgeLoopList(list<EdgeLoop*>** pEdgeLoopList)
 	{
-		*pEdgeLoopList = &edgeLoopList;
+		*pEdgeLoopList = edgeLoopList;
 		return 1;
 	}
 	int setEdgeLoopList(EdgeLoop* pEdgeLoop)
 	{
-		edgeLoopList.push_back(pEdgeLoop);
+		edgeLoopList->push_back(pEdgeLoop);
 		return 1;
 	}
 	int setVertexlist(vertex* pVertex)
 	{
-		vertexlist.push_back(pVertex);
+		vertexlist->push_back(pVertex);
 		return 1;
 	}
 	int getVertexList(list<vertex*>** pVertexList)
 	{
-		*pVertexList = &vertexlist;
+		*pVertexList = vertexlist;
 		return 1;
 	}
 	int getCommonEdgeList(list<edge*>** pEdgeList)
 	{
-		*pEdgeList = &commonEdgeList;
+		*pEdgeList = commonEdgeList;
 		return 1;
 	}
 	int setCommonEdgeList(edge* pEdge)
 	{
-		commonEdgeList.push_back(pEdge);
+		commonEdgeList->push_back(pEdge);
 		return 1;
 	}
 };
@@ -320,6 +345,7 @@ int createFace(Face& face, double pPoints[][2], int nNoOfEdgeLoops)
 			face.setVertexlist(pVertex);
 			pVertex->setFacelist(&face);
 			nVerticesCount++;
+			pEdgeLoop->setVertexlist(pVertex);
 			if (nVerticesCount == 2)
 			{
 				nVerticesCount = 1;
@@ -338,6 +364,7 @@ int createFace(Face& face, double pPoints[][2], int nNoOfEdgeLoops)
 				pEdge->setLength(length);
 
 				pEdgeLoop->setEdgeList(pEdge);
+				
 				if (j == (nNoOfVerticesOfloop - 1))
 				{
 					pEdge = new edge();
@@ -355,10 +382,12 @@ int createFace(Face& face, double pPoints[][2], int nNoOfEdgeLoops)
 				}
 			}
 			pPreviousVertex = pVertex;
+			nTemp = nTemp + 1;
 		}
-		nTemp = nTemp + 1;
+
 		pEdgeLoop->updateBoundingBox();
 	}
+	return 1;
 }
 
 int boundingBox(list<vertex*>* pVertexList, double* pMin, double* pMax)
@@ -366,9 +395,9 @@ int boundingBox(list<vertex*>* pVertexList, double* pMin, double* pMax)
 	double dMax[2] = { DBL_MIN, DBL_MIN }, dMin[2] = { DBL_MAX, DBL_MAX };
 	double* pXY = NULL;
 
-	for (auto vertex : *pVertexList)
+	for (auto pVertex : *pVertexList)
 	{
-		pXY = vertex->getVertexPosition();
+		pXY = pVertex->getVertexPosition();
 
 		for (int i = 0; i < 2; i++)
 		{
@@ -386,3 +415,4 @@ int boundingBox(list<vertex*>* pVertexList, double* pMin, double* pMax)
 	}
 	return 0;
 }
+
