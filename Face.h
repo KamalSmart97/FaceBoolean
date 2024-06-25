@@ -11,12 +11,16 @@ class vertex;
 class EdgeLoop;
 
 int boundingBox(list<vertex*>* pVertexList, double* pMin, double* pMax);
+int createFace(Face& face, double pPoints[][2], int nNoOfEdgeLoops);
 static int edgeId = 1, faceId = 1, loopId = 1, vertexId = 1;
 class edge
 {
 	int m_EdgeColor, m_id;
 	double m_dEdgelength;
 	int m_scratch;
+	EdgeLoop* m_pEdgeLoop;
+
+	vertex* m_pStartVertex, * m_pEndVertex;
 
 	//list<Face*> faceList;
 	list<vertex*>* vertexlist;
@@ -56,7 +60,10 @@ public:
 
 	int setVertexlist(vertex* pStartVertex, vertex* pEndVertex)
 	{
-
+		if (vertexlist->size() >= 2)
+			vertexlist->clear();
+		m_pStartVertex = pStartVertex;
+		m_pEndVertex = pEndVertex;
 		vertexlist->push_back(pStartVertex);
 		vertexlist->push_back(pEndVertex);
 		return 1;
@@ -65,6 +72,13 @@ public:
 	int getVertexList(list<vertex*>** pVertexList)
 	{
 		*pVertexList = vertexlist;
+		return 1;
+	}
+	int getEdgeVertices(vertex** PStartVertex, vertex** pEndVertex)
+	{
+		*PStartVertex = m_pStartVertex;
+		*pEndVertex = m_pEndVertex;
+
 		return 1;
 	}
 	int setFacelist(Face* pFace)
@@ -76,6 +90,15 @@ public:
 	{
 		*pFaceList = faceList;
 		return 1;
+	}
+	int setEdgeLoop(EdgeLoop* pEdgeLoop)
+	{
+		m_pEdgeLoop = pEdgeLoop;
+		return 1;
+	}
+	EdgeLoop* getEdgeLoop()
+	{
+		return m_pEdgeLoop;
 	}
 };
 class vertex
@@ -204,6 +227,13 @@ public:
 		*pVertexList = vertexlist;
 		return 1;
 	}
+	//nType =1 outer loop
+	//nType = 0 inner loop
+	int setLoopType(int ntype)
+	{
+		m_nLoopType = ntype;
+		return 1;
+	}
 
 };
 class Face
@@ -312,107 +342,4 @@ public:
 	}
 };
 
-int createFace(Face& face, double pPoints[][2], int nNoOfEdgeLoops)
-{
-	int nTemp = 0;
-	double length = 0.0;
-	vertex* pVertex = NULL, * pPreviousVertex = NULL, * pLoopStartVertex = NULL;
-	EdgeLoop* pEdgeLoop = NULL;
-	edge* pEdge = NULL;
-	int nNoOfVerticesOfloop = 0, nVerticesCount = 0;
-	//creating black face
-	for (int i = 0; i < nNoOfEdgeLoops; i++)
-	{
-		nVerticesCount = 0;
-		pLoopStartVertex = new vertex(pPoints[nTemp]);
-		face.setVertexlist(pLoopStartVertex);
-		pPreviousVertex = pLoopStartVertex;
-		pLoopStartVertex->setFacelist(&face);
-
-		nVerticesCount++;
-		pEdgeLoop = new EdgeLoop(pLoopStartVertex);
-		pEdgeLoop->setVertexlist(pLoopStartVertex);
-		nTemp++;
-
-		cout << " enter the no vertices in the loop %d" << i + 1 << "\n";
-		cin >> nNoOfVerticesOfloop;
-		cout << "\n enter the vertices xy in the order of the loop";
-
-		for (int j = 1; j < nNoOfVerticesOfloop; j++)
-		{
-			//cin>>
-			pVertex = new vertex(pPoints[nTemp]);
-			face.setVertexlist(pVertex);
-			pVertex->setFacelist(&face);
-			nVerticesCount++;
-			pEdgeLoop->setVertexlist(pVertex);
-			if (nVerticesCount == 2)
-			{
-				nVerticesCount = 1;
-				pEdge = new edge();
-				face.setEdgeList(pEdge);
-				pVertex->setFacelist(&face);
-
-				pEdge->setVertexlist(pPreviousVertex, pVertex);
-				pPreviousVertex->setEdgeList(pEdge);
-				pVertex->setEdgeList(pEdge);
-
-				pEdge->setFacelist(&face);
-				pEdge->setColor(1);
-
-				length = distanceBetweenPoints(pPreviousVertex->getVertexPosition(), pVertex->getVertexPosition());
-				pEdge->setLength(length);
-
-				pEdgeLoop->setEdgeList(pEdge);
-				
-				if (j == (nNoOfVerticesOfloop - 1))
-				{
-					pEdge = new edge();
-					pEdge->setVertexlist(pVertex, pLoopStartVertex);
-					pLoopStartVertex->setEdgeList(pEdge);
-					pVertex->setEdgeList(pEdge);
-					pLoopStartVertex->setFacelist(&face);
-					face.setEdgeList(pEdge);
-
-					pEdge->setFacelist(&face);
-					pEdge->setColor(1);
-
-					length = distanceBetweenPoints(pVertex->getVertexPosition(), pLoopStartVertex->getVertexPosition());
-					pEdgeLoop->setEdgeList(pEdge);
-				}
-			}
-			pPreviousVertex = pVertex;
-			nTemp = nTemp + 1;
-		}
-
-		pEdgeLoop->updateBoundingBox();
-	}
-	return 1;
-}
-
-int boundingBox(list<vertex*>* pVertexList, double* pMin, double* pMax)
-{
-	double dMax[2] = { DBL_MIN, DBL_MIN }, dMin[2] = { DBL_MAX, DBL_MAX };
-	double* pXY = NULL;
-
-	for (auto pVertex : *pVertexList)
-	{
-		pXY = pVertex->getVertexPosition();
-
-		for (int i = 0; i < 2; i++)
-		{
-			if (pXY[i] > dMax[i])
-				dMax[i] = pXY[i];
-
-			if (pXY[i] < dMin[i])
-				dMin[i] = pXY[i];
-		}
-	}
-	for (int i = 0; i < 2; i++)
-	{
-		pMin[i] = dMin[i];
-		pMax[i] = dMax[i];
-	}
-	return 0;
-}
 
