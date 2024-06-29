@@ -11,7 +11,9 @@ class vertex;
 class EdgeLoop;
 
 int boundingBox(list<vertex*>* pVertexList, double* pMin, double* pMax);
-int createFace(Face& face, double pPoints[][2], int nNoOfEdgeLoops);
+int createFace(Face& face, double pPoints[][2], int nNoOfEdgeLoops, int color);
+int faceBoolean(Face& face1, Face& face2, Face& BooleanFace);
+int splitEdgeAtGivenPoint(edge* pInputEdge, Face& Inputface, vertex* pStartVertex, vertex* pEndVertex, double* pIntersectionPoint);
 static int edgeId = 1, faceId = 1, loopId = 1, vertexId = 1;
 class edge
 {
@@ -48,12 +50,12 @@ public:
 	{
 		return m_EdgeColor;
 	}
-	int setLength(int dLength)
+	int setLength(double dLength)
 	{
 		m_dEdgelength = dLength;
 		return 1;
 	}
-	int getLength()
+	double getLength()
 	{
 		return m_dEdgelength;
 	}

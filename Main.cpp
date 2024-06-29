@@ -5,7 +5,7 @@
 // No two loop shares the common vertex.
 int main()
 {
-	Face redFace, blackFace;
+	Face redFace, blackFace, booleanFace;
 	vertex* pVertex = NULL, * pPreviousVertex = NULL, * pLoopStartVertex = NULL;
 	EdgeLoop* pEdgeLoop = NULL;
 	edge* pEdge = NULL;
@@ -26,7 +26,7 @@ int main()
 	cout << " enter the no of edge loops";
 	cin >> nNoOfEdgeLoops;
 
-	createFace(blackFace, dblackVertices, nNoOfEdgeLoops);
+	createFace(blackFace, dblackVertices, nNoOfEdgeLoops,1);
 
 	cout << " enter the total no of vertices of the red faces";
 	cin >> nNoOfverticesOfTheFace;
@@ -34,10 +34,9 @@ int main()
 	cin >> nEnterTheEdgesOfFace;
 	cout << " enter the no of edge loops";
 	cin >> nNoOfEdgeLoops;
-	createFace(redFace, dRedVertices, nNoOfEdgeLoops);
+	createFace(redFace, dRedVertices, nNoOfEdgeLoops,2);
 
-
-	return 0;
-		
+	faceBoolean(blackFace,redFace,booleanFace);
 	
+	return 0;	
 }

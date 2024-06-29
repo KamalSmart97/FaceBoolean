@@ -1,6 +1,7 @@
 #include"Face.h"
+#define _CRT_SECURE_NO_WARNINGS
 
-int createFace(Face& face, double pPoints[][2], int nNoOfEdgeLoops)
+int createFace(Face& face, double pPoints[][2], int nNoOfEdgeLoops, int color)
 {
 	int nTemp = 0, nNoOfVerticesOfloop = 0, nVerticesCount = 0;
 	double length = 0.0, dBBlength = 0, *pBoundingBox = NULL, dTempLen = DBL_MIN;
@@ -22,7 +23,7 @@ int createFace(Face& face, double pPoints[][2], int nNoOfEdgeLoops)
 		pEdgeLoop->setVertexlist(pLoopStartVertex);
 		nTemp++;
 
-		cout << " enter the no vertices in the loop %d" << i + 1 << "\n";
+		cout << " enter the no vertices in the loop " << i + 1 << "\n";
 		cin >> nNoOfVerticesOfloop;
 		cout << "\n enter the vertices xy in the order of the loop";
 
@@ -68,6 +69,7 @@ int createFace(Face& face, double pPoints[][2], int nNoOfEdgeLoops)
 					pEdge->setColor(1);
 
 					length = distanceBetweenPoints(pVertex->getVertexPosition(), pLoopStartVertex->getVertexPosition());
+					pEdge->setLength(length);
 					pEdgeLoop->setEdgeList(pEdge);
 				}
 			}
@@ -129,26 +131,84 @@ int faceBoolean(Face& face1, Face& face2, Face& BooleanFace)
 
 	vertex* pEdge1Vertex1 = NULL, * pEdge1Vertex2 = NULL, * pEdge2Vertex1 = NULL, * pEdge2Vertex2 = NULL;
 
+	list<vertex*>* pVertexList = NULL;
+
 	face1.getEdgeList(&pEdgeListFace1);
 	face2.getEdgeList(&pEdgeListFace2);
 
-	double dIntersectionPoint[2] = { 0.0 }, dLength = 0.0;
-	bool bIntersect = false;
+	double dIntersectionPoint[2] = { 0.0 }, dLength[2] = { 0.0 }, dTemp[2] = { 0.0 };
+	bool bIntersect = false, bSkipEdge = false, bSplit = false;
+
+	double* p[4] = {NULL };
 	// create the intesection vertices, edges formed after the intersection
 	//update the edge loop
-	for (auto pEdge1 : *pEdgeListFace1)
+
+	for (list<edge*>::iterator pEdge1 = pEdgeListFace1->begin(); pEdge1 != pEdgeListFace1->end(); pEdge1++)
 	{
-		pEdge1->getEdgeVertices(&pEdge1Vertex1, &pEdge1Vertex2);
-		for (auto pEdge2 : *pEdgeListFace2)
+		for (list<edge*>::iterator pEdge2 = pEdgeListFace2->begin(); pEdge2 != pEdgeListFace2->end(); pEdge2++)
 		{
-			pEdge2->getEdgeVertices(&pEdge2Vertex1, &pEdge2Vertex2);
-			bIntersect = LineLineIntersect(pEdge1Vertex1->getVertexPosition(), pEdge1Vertex2->getVertexPosition(), pEdge2Vertex1->getVertexPosition(), pEdge2Vertex2->getVertexPosition(), dIntersectionPoint);
-			if (bIntersect)
+			(*pEdge1)->getEdgeVertices(&pEdge1Vertex1, &pEdge1Vertex2);
+			(*pEdge2)->getEdgeVertices(&pEdge2Vertex1, &pEdge2Vertex2);
+
+			dLength[0] = (*pEdge1)->getLength();
+			dLength[1] = (*pEdge2)->getLength();
+
+			p[0] = pEdge1Vertex1->getVertexPosition();
+			p[1] = pEdge1Vertex2->getVertexPosition();
+			p[2] = pEdge2Vertex1->getVertexPosition();
+			p[3] = pEdge2Vertex2->getVertexPosition();
+
+			bSkipEdge = false;
+			for (int i = 0; i < 2; i++)
 			{
-				splitEdgeAtGivenPoint(pEdge1, face1, pEdge1Vertex1, pEdge1Vertex2, dIntersectionPoint);
-				splitEdgeAtGivenPoint(pEdge2, face2, pEdge2Vertex1, pEdge2Vertex2, dIntersectionPoint);
+				dTemp[0] = distanceBetweenPoints(p[i], p[2]);
+				dTemp[1] = distanceBetweenPoints(p[i], p[3]);
+
+				if ((dTemp[0] < 0.000001) || (dTemp[1] < 0.000001))
+				{
+					bSkipEdge = true;
+					break;
+				}
+			}
+			if (!bSkipEdge)
+			{
+				bIntersect = LineLineIntersect(p[0], p[1], p[2], p[3], dIntersectionPoint);
+
+				if (bIntersect)
+				{
+					bSplit = true;
+					for (int i = 0; i < 2; i++)
+					{
+						dTemp[0] = distanceBetweenPoints(p[2 * i], dIntersectionPoint);
+						dTemp[1] = distanceBetweenPoints(p[2 * i + 1], dIntersectionPoint);
+
+						if ((dTemp[0] > dLength[i]) || (dTemp[1] > dLength[i]))
+						{
+							bSplit = false;
+							break;
+						}
+					}
+					if (bSplit)
+					{
+						splitEdgeAtGivenPoint((*pEdge1), face1, pEdge1Vertex1, pEdge1Vertex2, dIntersectionPoint);
+						splitEdgeAtGivenPoint((*pEdge2), face2, pEdge2Vertex1, pEdge2Vertex2, dIntersectionPoint);
+					}
+				}
 			}
 		}
+	}
+	FILE* pDebugFile = NULL;
+
+	pDebugFile = fopen("d:\\vertexdump.txt", "w");
+	face1.getVertexList(&pVertexList);
+	for (auto pEdge1Vertex1 : *pVertexList)
+	{
+		fprintf(pDebugFile, "%lf, %lf, 0\n", pEdge1Vertex1->getVertexPosition()[0], pEdge1Vertex1->getVertexPosition()[1]);
+	}
+	face2.getVertexList(&pVertexList);
+	for (auto pEdge1Vertex1 : *pVertexList)
+	{
+		fprintf(pDebugFile, "%lf, %lf, 0\n", pEdge1Vertex1->getVertexPosition()[0], pEdge1Vertex1->getVertexPosition()[1]);
 	}
 	return 1;
 }
@@ -180,7 +240,7 @@ int splitEdgeAtGivenPoint(edge* pInputEdge, Face& Inputface, vertex* pStartVerte
 	pVertex->setEdgeList(pInputEdge);
 
 	pEdge->setFacelist(&Inputface);
-	pEdge->setColor(1);
+	pEdge->setColor(2);
 
 	dLength = distanceBetweenPoints(pVertex->getVertexPosition(), pEndVertex->getVertexPosition());
 	pEdge->setLength(dLength);
