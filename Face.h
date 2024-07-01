@@ -102,6 +102,15 @@ public:
 	{
 		return m_pEdgeLoop;
 	}
+	int setScratch(int nScratch)
+	{
+		m_scratch = nScratch;
+		return 1;
+	}
+	int getSratch()
+	{
+		return m_scratch;
+	}
 };
 class vertex
 {
@@ -145,6 +154,15 @@ public:
 	double* getVertexPosition()
 	{
 		return dXY;
+	}
+	int setScratch(int nScratch)
+	{
+		m_Scratch = nScratch;
+		return 1;
+	}
+	int getSratch()
+	{
+		return m_Scratch;
 	}
 };
 
@@ -235,6 +253,10 @@ public:
 	{
 		m_nLoopType = ntype;
 		return 1;
+	}
+	int getLoopType()
+	{
+		return m_nLoopType;
 	}
 
 };

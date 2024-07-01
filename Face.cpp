@@ -124,22 +124,25 @@ int boundingBox(list<vertex*>* pVertexList, double* pMin, double* pMax)
 	return 0;
 }
 
+//one case need to be handled empty loop within empty loop
+
 int faceBoolean(Face& face1, Face& face2, Face& BooleanFace)
 {
 
-	list<edge*>* pEdgeListFace1 = NULL, * pEdgeListFace2 = NULL;
+	list<edge*>* pEdgeListFace1 = NULL, * pEdgeListFace2 = NULL, * pLoopEdgeListFace1 = NULL, * pLoopEdgeListFace2 = NULL, * pEdgeList = NULL;
+	list<EdgeLoop*>* pFace1LoopList = NULL, * pFace2LoopList = NULL;
+	list<vertex*>* pVertexList = NULL, * pLoopVertexListFace1 = NULL, * pLoopVertexListFace2 = NULL;
 
 	vertex* pEdge1Vertex1 = NULL, * pEdge1Vertex2 = NULL, * pEdge2Vertex1 = NULL, * pEdge2Vertex2 = NULL;
-
-	list<vertex*>* pVertexList = NULL;
 
 	face1.getEdgeList(&pEdgeListFace1);
 	face2.getEdgeList(&pEdgeListFace2);
 
-	double dIntersectionPoint[2] = { 0.0 }, dLength[2] = { 0.0 }, dTemp[2] = { 0.0 };
+	double dIntersectionPoint[2] = { 0.0 }, dLength[2] = { 0.0 }, dTemp[2] = { 0.0 }, dDistance = 0.0, dTempDistance = 0.0, dCopy1[2] = { 0.0 }, dCopy2[2] = { 0.0 };
 	bool bIntersect = false, bSkipEdge = false, bSplit = false;
 
-	double* p[4] = {NULL };
+	double* p[4] = { NULL };
+	int nLoopTypeFace1 = 0, nLoopTypeFace2 = 0, nInersection = 0, nReduceIntersection = 0;
 	// create the intesection vertices, edges formed after the intersection
 	//update the edge loop
 
@@ -197,19 +200,295 @@ int faceBoolean(Face& face1, Face& face2, Face& BooleanFace)
 			}
 		}
 	}
-	FILE* pDebugFile = NULL;
 
-	pDebugFile = fopen("d:\\vertexdump.txt", "w");
-	face1.getVertexList(&pVertexList);
-	for (auto pEdge1Vertex1 : *pVertexList)
+	//find the vertices of empty edge loop of one color inside the filled edge loop of other color
+	//finding the vertices of empty edge loop of one color inside the empty loop of other color is not done yet.
+	face1.getEdgeLoopList(&pFace1LoopList);
+	face2.getEdgeLoopList(&pFace2LoopList);
+	for (auto pEdgeLoop1 : *pFace1LoopList)
 	{
-		fprintf(pDebugFile, "%lf, %lf, 0\n", pEdge1Vertex1->getVertexPosition()[0], pEdge1Vertex1->getVertexPosition()[1]);
+		nLoopTypeFace1 = pEdgeLoop1->getLoopType();
+		pEdgeLoop1->getEdgeList(&pLoopEdgeListFace1);
+		pEdgeLoop1->getVertexList(&pLoopVertexListFace1);
+		for (auto pEdgeLoop2 : *pFace2LoopList)
+		{
+			nLoopTypeFace2 = pEdgeLoop2->getLoopType();
+			if (nLoopTypeFace1 == nLoopTypeFace2)
+				continue;
+
+			pEdgeLoop2->getVertexList(&pLoopVertexListFace2);
+			pEdgeLoop2->getEdgeList(&pLoopEdgeListFace2);
+			if (nLoopTypeFace1 == 1)
+			{
+				pVertexList = pLoopVertexListFace2;
+				pEdgeList = pLoopEdgeListFace1;
+			}
+			else
+			{
+				pVertexList = pLoopVertexListFace1;
+				pEdgeList = pLoopEdgeListFace2;
+			}
+			for (auto pVertex : *pVertexList)
+			{
+				if (pVertex->getSratch() == 1)
+					continue;
+				nInersection = 0;
+				nReduceIntersection = 0;
+				for (auto pEdge : *pEdgeList)
+				{
+					pEdge->getEdgeVertices(&pEdge2Vertex1, &pEdge2Vertex2);
+					p[0] = pVertex->getVertexPosition();
+					dCopy1[0] = 0.0;
+					dCopy1[1] = p[0][1];
+					p[1] = dCopy1;
+					dLength[0] = distanceBetweenPoints(p[0], p[1]);
+					p[2] = pEdge2Vertex1->getVertexPosition();
+					p[3] = pEdge2Vertex2->getVertexPosition();
+					dLength[1] = pEdge->getLength();
+
+					bIntersect = LineLineIntersect(p[0], p[1], p[2], p[3], dIntersectionPoint);
+
+					if (bIntersect)
+					{
+						bSplit = true;
+						for (int i = 0; i < 2; i++)
+						{
+							dTemp[0] = distanceBetweenPoints(p[2 * i], dIntersectionPoint);
+							dTemp[1] = distanceBetweenPoints(p[2 * i + 1], dIntersectionPoint);
+
+							if ((dTemp[0] > (dLength[i]+0.000001)) || (dTemp[1] > (dLength[i]+0.000001)))
+							{
+								bSplit = false;
+								break;
+							}
+						}
+					}
+					if (bSplit)
+					{
+						dTemp[0] = distanceBetweenPoints(dIntersectionPoint, p[2]);
+						dTemp[1] = distanceBetweenPoints(dIntersectionPoint, p[3]);
+
+						if ((dTemp[0] < 0.000001) || (dTemp[1] < 0.000001))
+							++nReduceIntersection;
+
+						nInersection++;
+					}
+				}
+				if (nReduceIntersection > 0)
+				{
+					nReduceIntersection = nReduceIntersection / 2;
+					nInersection -= nReduceIntersection;
+				}
+				if (nInersection % 2 != 0)
+					pVertex->setScratch(1);
+			}
+		}
 	}
-	face2.getVertexList(&pVertexList);
-	for (auto pEdge1Vertex1 : *pVertexList)
+	// mark the edges which should not be there after boolean
+	//conditions: if it is a empty edge loop  both the vertices are scratched to one then it should not be there after boolean.
+	// because the edge is inside the filled loop of other color.
+	// if the edge loop is filled and both the vertices are scratched to one the find wether the edge is inside the filled loop of other color
+	// remove it to.
+	for (auto pEdgeLoop1 : *pFace1LoopList)
 	{
-		fprintf(pDebugFile, "%lf, %lf, 0\n", pEdge1Vertex1->getVertexPosition()[0], pEdge1Vertex1->getVertexPosition()[1]);
+		nLoopTypeFace1 = pEdgeLoop1->getLoopType();
+		pEdgeLoop1->getEdgeList(&pLoopEdgeListFace1);
+
+		for (auto pEdge : *pLoopEdgeListFace1)
+		{
+			pEdge->getEdgeVertices(&pEdge1Vertex1, &pEdge1Vertex2);
+
+			if ((pEdge1Vertex1->getSratch() == 1) && (pEdge1Vertex2->getSratch() == 1))
+			{
+				if (nLoopTypeFace1 != 1)
+				{
+					pEdge->setScratch(1);
+				}
+				else
+				{
+					/*for (auto pEdgeLoop2 : *pFace2LoopList)
+					{
+						nLoopTypeFace2 = pEdgeLoop2->getLoopType();
+						pEdgeLoop2->getEdgeList(&pLoopEdgeListFace2);
+
+						if (nLoopTypeFace1 == nLoopTypeFace2)
+						{
+							nInersection = 0;
+							nReduceIntersection = 0;
+							for (auto pTraversedge : *pLoopEdgeListFace2)
+							{
+								pTraversedge->getEdgeVertices(&pEdge2Vertex1, &pEdge2Vertex2);
+								dLength[0] = distanceBetweenPoints(p[0], p[1]);
+								p[2] = pEdge2Vertex1->getVertexPosition();
+								p[3] = pEdge2Vertex2->getVertexPosition();
+
+								p[0] = pEdge1Vertex1->getVertexPosition();
+								p[1] = pEdge1Vertex2->getVertexPosition();
+								dCopy1[0] = (p[0][0] +  p[1][0]) / 2;
+								dCopy1[1] = (p[0][1] + p[1][1]) / 2;
+								dCopy2[0] = 0.0;
+								dCopy2[1] = dCopy1[1];
+								p[0] = dCopy1;
+								p[1] = dCopy2;
+								dLength[1] = pEdge->getLength();
+
+								bIntersect = LineLineIntersect(p[0], p[1], p[2], p[3], dIntersectionPoint);
+
+								dTemp[0] = distanceBetweenPoints(dIntersectionPoint, p[2]);
+								dTemp[1] = distanceBetweenPoints(dIntersectionPoint, p[3]);
+
+								if ((dTemp[0] < 0.000001) || (dTemp[1] < 0.000001))
+									++nReduceIntersection;
+
+								if (bIntersect)
+								{
+									bSplit = true;
+									for (int i = 0; i < 2; i++)
+									{
+										dTemp[0] = distanceBetweenPoints(p[2 * i], dIntersectionPoint);
+										dTemp[1] = distanceBetweenPoints(p[2 * i + 1], dIntersectionPoint);
+
+										if ((dTemp[0] > dLength[i]) || (dTemp[1] > dLength[i]))
+										{
+											bSplit = false;
+											break;
+										}
+									}
+								}
+								if (bSplit)
+									nInersection++;
+							}
+							if (nReduceIntersection > 0)
+							{
+								nReduceIntersection = nReduceIntersection / 2;
+								nInersection -= nReduceIntersection;
+							}
+							if (nInersection % 2 != 0)
+								pEdge->setScratch(1);
+						}
+					}*/
+				}
+			}
+		}
 	}
+	for (auto pEdgeLoop2 : *pFace2LoopList)
+	{
+		nLoopTypeFace2 = pEdgeLoop2->getLoopType();
+		pEdgeLoop2->getEdgeList(&pLoopEdgeListFace2);
+
+		for (auto pEdge : *pLoopEdgeListFace2)
+		{
+			pEdge->getEdgeVertices(&pEdge2Vertex1, &pEdge2Vertex2);
+
+			if ((pEdge2Vertex1->getSratch() == 1) && (pEdge2Vertex2->getSratch() == 1))
+			{
+				if (nLoopTypeFace2 != 1)
+				{
+					pEdge->setScratch(1);
+				}
+				else
+				{
+					/*for (auto pEdgeLoop1 : *pFace1LoopList)
+					{
+						nLoopTypeFace1 = pEdgeLoop1->getLoopType();
+						pEdgeLoop1->getEdgeList(&pLoopEdgeListFace1);
+
+						if (nLoopTypeFace1 == nLoopTypeFace2)
+						{
+							nInersection = 0;
+							nReduceIntersection = 0;
+							for (auto pTraversedge : *pLoopEdgeListFace1)
+							{
+								pTraversedge->getEdgeVertices(&pEdge1Vertex1, &pEdge1Vertex2);
+								dLength[0] = distanceBetweenPoints(p[0], p[1]);
+								p[2] = pEdge1Vertex1->getVertexPosition();
+								p[3] = pEdge1Vertex2->getVertexPosition();
+
+								p[0] = pEdge2Vertex1->getVertexPosition();
+								p[1] = pEdge2Vertex2->getVertexPosition();
+								dCopy1[0] = (p[0][0] + p[1][0]) / 2;
+								dCopy1[1] = (p[0][1] + p[1][1]) / 2;
+								dCopy2[0] = 0.0;
+								dCopy2[1] = dCopy1[1];
+								p[0] = dCopy1;
+								p[1] = dCopy2;
+								dLength[1] = pEdge->getLength();
+
+								bIntersect = LineLineIntersect(p[0], p[1], p[2], p[3], dIntersectionPoint);
+
+								dTemp[0] = distanceBetweenPoints(dIntersectionPoint, p[2]);
+								dTemp[1] = distanceBetweenPoints(dIntersectionPoint, p[3]);
+
+								if ((dTemp[0] < 0.000001) || (dTemp[1] < 0.000001))
+									++nReduceIntersection;
+
+								if (bIntersect)
+								{
+									bSplit = true;
+									for (int i = 0; i < 2; i++)
+									{
+										dTemp[0] = distanceBetweenPoints(p[2 * i], dIntersectionPoint);
+										dTemp[1] = distanceBetweenPoints(p[2 * i + 1], dIntersectionPoint);
+
+										if ((dTemp[0] > dLength[i]) || (dTemp[1] > dLength[i]))
+										{
+											bSplit = false;
+											break;
+										}
+									}
+								}
+								if (bSplit)
+									nInersection++;
+							}
+							if (nReduceIntersection > 0)
+							{
+								nReduceIntersection = nReduceIntersection / 2;
+								nInersection -= nReduceIntersection;
+							}
+							if (nInersection % 2 != 0)
+								pEdge->setScratch(1);
+						}
+					}*/
+				}
+			}
+		}
+	}
+
+	FILE* pDebugFile = NULL;
+	FILE* pDebugFile1 = NULL;
+
+	pDebugFile1 = fopen("d:\\edgeDumpnew.txt", "w");
+	//pDebugFile = fopen("d:\\edgeDumpwithScratch.txt", "w");
+	//face1.getVertexList(&pVertexList);
+	face1.getEdgeLoopList(&pFace1LoopList);
+
+	for (auto pEdgeLoop1 : *pFace1LoopList)
+	{
+		pEdgeLoop1->getEdgeList(&pEdgeList);
+		for (auto pEdge1 : *pEdgeList)
+		{
+			pEdge1->getEdgeVertices(&pEdge1Vertex1, &pEdge1Vertex2);
+			if (pEdge1->getSratch() == 1)
+				fprintf(pDebugFile1, "%lf, %lf, %lf, %lf,remove\n", pEdge1Vertex1->getVertexPosition()[0], pEdge1Vertex1->getVertexPosition()[1], pEdge1Vertex2->getVertexPosition()[0], pEdge1Vertex2->getVertexPosition()[1]);
+			else
+				fprintf(pDebugFile1, "%lf, %lf, %lf, %lf, \n", pEdge1Vertex1->getVertexPosition()[0], pEdge1Vertex1->getVertexPosition()[1], pEdge1Vertex2->getVertexPosition()[0], pEdge1Vertex2->getVertexPosition()[1]);
+		}
+	}
+	//face2.getVertexList(&pVertexList);
+	face2.getEdgeLoopList(&pFace2LoopList);
+	for (auto pEdgeLoop1 : *pFace2LoopList)
+	{
+		pEdgeLoop1->getEdgeList(&pEdgeList);
+		for (auto pEdge2 : *pEdgeList)
+		{
+			pEdge2->getEdgeVertices(&pEdge2Vertex1, &pEdge2Vertex2);
+			if (pEdge2->getSratch() == 1)
+				fprintf(pDebugFile1, "%lf, %lf, %lf, %lf,remove\n", pEdge2Vertex1->getVertexPosition()[0], pEdge2Vertex1->getVertexPosition()[1], pEdge2Vertex2->getVertexPosition()[0], pEdge2Vertex2->getVertexPosition()[1]);
+			else
+				fprintf(pDebugFile1, "%lf, %lf, %lf, %lf, \n", pEdge2Vertex1->getVertexPosition()[0], pEdge2Vertex1->getVertexPosition()[1], pEdge2Vertex2->getVertexPosition()[0], pEdge2Vertex2->getVertexPosition()[1]);
+		}
+	}
+
 	return 1;
 }
 
@@ -227,7 +506,8 @@ int splitEdgeAtGivenPoint(edge* pInputEdge, Face& Inputface, vertex* pStartVerte
 	pVertex = new vertex(pIntersectionPoint);
 	Inputface.setVertexlist(pVertex);
 	pVertex->setFacelist(&Inputface);
-
+	pVertex->setScratch(1);
+	
 	pEdgeLoop = pInputEdge->getEdgeLoop();
 	pEdgeLoop->getEdgeList(&pLoopEdgeList);
 
@@ -253,7 +533,7 @@ int splitEdgeAtGivenPoint(edge* pInputEdge, Face& Inputface, vertex* pStartVerte
 	{
 		if (*i == pInputEdge)
 		{
-			pLoopEdgeList->insert((i++), pEdge);
+			pLoopEdgeList->insert((++i), pEdge);
 			break;
 		}
 	}
@@ -261,9 +541,9 @@ int splitEdgeAtGivenPoint(edge* pInputEdge, Face& Inputface, vertex* pStartVerte
 	pEdgeLoop->getVertexList(&pLoopVertexList);
 	for (list<vertex*>::iterator i = pLoopVertexList->begin(); i != pLoopVertexList->end(); i++)
 	{
-		if (*i == pVertex)
+		if (*i == pStartVertex)
 		{
-			pLoopVertexList->insert((i++), pVertex);
+			pLoopVertexList->insert((++i), pVertex);
 			break;
 		}
 	}
